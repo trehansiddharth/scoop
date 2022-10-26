@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import random
 import time
 from typing import Union
-import pickle
+import pickle    
 
 NoneType = type(None)
 
@@ -96,6 +96,7 @@ class Animal:
   scoopPoliteness : int = 0
   canScoopLater: bool = False
   lastFed : Union[NoneType, Timestamp]
+  owner: Union[NoneType, str] = None
 
   def __init__(self, animalType: AnimalType, checkinTimestamp: Timestamp):
     self.type = animalType
@@ -137,9 +138,11 @@ class Animal:
       hoursSinceLastFed = (timestamp - lastFed) / HOUR
       return int(RARITY_GRAINS_PER_HOUR[self.type.rarity] * hoursSinceLastFed)
   
-  def feed(self, timestamp: Timestamp, grains: int) -> Union[AnimalFeedResult, int]:
+  def feed(self, timestamp: Timestamp, grains: int, username: str) -> Union[AnimalFeedResult, int]:
     state = self.getState(timestamp)
     if state == AnimalState.SCOOPED:
+      if not (self.owner == username):
+        return AnimalFeedResult.NOT_SCOOPED
       hunger = self.getTheoreticalHunger(timestamp)
       if (hunger > grains):
         return AnimalFeedResult.NOT_ENOUGH_GRAINS
@@ -166,11 +169,12 @@ class Animal:
     else:
       return AnimalCanScoopResult.GONE
   
-  def scoop(self, timestamp: Timestamp) -> AnimalScoopResult:
+  def scoop(self, timestamp: Timestamp, owner: str) -> AnimalScoopResult:
     state = self.getState(timestamp)
     if state == AnimalState.HANGING_OUT:
       if (self.canScoopLater):
         self.scoopedAt = timestamp
+        self.owner = owner
         return AnimalScoopResult.OK
       else:
         return AnimalScoopResult.NO_PERMISSION
@@ -179,35 +183,54 @@ class Animal:
     else:
       return AnimalScoopResult.GONE
 
+class StateMutator(object):
+  def __init__(self, username):
+    self.username = username
+    if not os.path.exists(os.path.join(DIRNAME, "sessions")):
+      os.mkdir(os.path.join(DIRNAME, "sessions"))
+    if not os.path.isfile(os.path.join(DIRNAME, "sessions", "global.session")):
+      with open(os.path.join(DIRNAME, "sessions", "global.session"), "wb") as f:
+        pickle.dump([0, {}], f)
+    if not os.path.isfile(os.path.join(DIRNAME, "sessions", username)):
+      with open(os.path.join(DIRNAME, "sessions", username), "wb") as f:
+        pickle.dump(0, f)
+
+  def __enter__(self):
+    with open(os.path.join(DIRNAME, "sessions", "global.session"), "rb") as f:
+      lastCheckinTime, animals = pickle.load(f)
+    with open(os.path.join(DIRNAME, "sessions", self.username), "rb") as f:
+      grains = pickle.load(f)
+    return lastCheckinTime, grains, animals
+  
+  def __exit__(self, lastCheckinTime, grains, animals):
+    with open(os.path.join(DIRNAME, "sessions", "global.session"), "wb") as f:
+      pickle.dump([lastCheckinTime, animals], f)
+    with open(os.path.join(DIRNAME, "sessions", self.username), "wb") as f:
+      pickle.dump(grains, f)
+
 if __name__ == "__main__":
 
   username : str = ""
   while ((username == "") or (not username.isalnum())):
     username = input("Enter a username to begin: ")
-
-  if os.path.exists(os.path.join(DIRNAME, "sessions")):
-    with open(os.path.join(DIRNAME, "sessions", username), "rb") as f:
-      lastCheckinTime, grains, animals = pickle.load(f)
-  else:
-    os.mkdir(os.path.join(DIRNAME, "sessions"))
-    lastCheckinTime: Timestamp = 0
-    grains : int = 0
-    animals: dict[str, Animal] = {}
-    with open(os.path.join(DIRNAME, "sessions", username), "wb") as f:
-      pickle.dump([lastCheckinTime, grains, animals], f)
     
   print("")
   print(f"Welcome {username}! Available commands are: barn, caniscoop <name>, checkin, exit, feed <name>, pick, scoop <name>")
   print("Hint: try starting out by checking in: `checkin`")
   print("")
 
+  mutator = StateMutator(username)
+
   while True:
     command = input("> ")
     print("")
+    lastCheckinTime, grains, animals = mutator.__enter__()
     if command == "barn":
       animalCount = 0
       print("Here's all the animals in the barn right now:")
       for name, animal in animals.items():
+        if animal.owner != username:
+          continue
         animalState = animal.getState(time.time())
         if (animalState == AnimalState.SCOOPED):
           print(f"  {animal.type.emoji} {name} (the {animal.type.name})")
@@ -253,7 +276,7 @@ if __name__ == "__main__":
           modifier = ({
             1 : "",
             2: " (* rare! *)",
-            3: " (* super-rare! *)"
+            3: " (** super-rare! **)"
           })[animal.rarity]
           print(f"  {animal.emoji} {name} (the {animal.name}) has come to hang out!{modifier}")
           animalCount += 1
@@ -266,7 +289,7 @@ if __name__ == "__main__":
           modifier = ({
             1 : "",
             2: " (* rare! *)",
-            3: " (* super-rare! *)"
+            3: " (** super-rare! **)"
           })[animal.type.rarity]
           print(f"  {animal.type.emoji} {name} (the {animal.type.name}) is hanging out.{modifier}")
           animalCount += 1
@@ -277,6 +300,8 @@ if __name__ == "__main__":
       barnCount = 0
       for animal in animals:
         animal : Animal = animals[name]
+        if animal.owner != username:
+          continue
         animalState : AnimalState = animal.getState(currentTimestamp)
         if (animalState == AnimalState.SCOOPED):
           hunger = animal.getTheoreticalHunger(currentTimestamp)
@@ -286,6 +311,8 @@ if __name__ == "__main__":
         elif (animalState == AnimalState.DEAD):
           print(f"   {animal.type.emoji} {name} died from hunger :( Be sure to feed your animals!")
           barnCount += 1
+          del animals[name]
+        elif (animalState == AnimalState.LEFT):
           del animals[name]
       if barnCount == 0:
         print("  Nothing to report in the barn!")
@@ -297,7 +324,7 @@ if __name__ == "__main__":
         print(f"There's no such animal named '{name}'")
       else:
         animal = animals[name]
-        feedResult = animal.feed(time.time(), grains)
+        feedResult = animal.feed(time.time(), grains, username)
         if (type(feedResult) == int):
           grains -= feedResult
           print(f"You fed {animal.type.emoji} {name} {feedResult} grains! They're full now!")
@@ -317,7 +344,7 @@ if __name__ == "__main__":
         print(f"There's no such animal named '{name}'")
       else:
         animal = animals[name]
-        scoopResult = animal.scoop(time.time())
+        scoopResult = animal.scoop(time.time(), username)
         if (scoopResult == AnimalScoopResult.OK):
           print(f"{animal.type.emoji} {name} has been scooped! Check the barn: `barn`")
         elif (scoopResult == AnimalScoopResult.NO_PERMISSION):
@@ -332,5 +359,4 @@ if __name__ == "__main__":
       print("Unknown command. Available commands are: barn, caniscoop <name>, checkin, exit, feed <name>, pick, scoop <name>")
     print("")
 
-    with open(os.path.join(DIRNAME, "sessions", username), "wb") as f:
-      pickle.dump([lastCheckinTime, grains, animals], f)
+    mutator.__exit__(lastCheckinTime, grains, animals)

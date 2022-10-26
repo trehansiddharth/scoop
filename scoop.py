@@ -19,9 +19,9 @@ DAY = 24 * HOUR
 
 DIRNAME = os.path.dirname(os.path.realpath(__file__))
 RARITY_CHECKIN_PROB_PER_MINUTE = {
-  1 : 0.005,
-  2 : 0.002,
-  3 : 0.0005
+  1 : 0.008,
+  2 : 0.003,
+  3 : 0.0007
 }
 HANGOUT_TIME = 10 * MINUTE
 RARITY_GRAINS_PER_HOUR = {

@@ -235,7 +235,7 @@ if __name__ == "__main__":
           1 : "",
           2: " (* rare! *)",
           3: " (** super-rare! **)"
-        })[animal.rarity]
+        })[animal.type.rarity]
         animalState = animal.getState(time.time())
         if (animalState == AnimalState.SCOOPED):
           print(f"  {animal.type.emoji} {name} (the {animal.type.name}){modifier}")

@@ -231,9 +231,14 @@ if __name__ == "__main__":
       for name, animal in animals.items():
         if animal.owner != username:
           continue
+        modifier = ({
+          1 : "",
+          2: " (* rare! *)",
+          3: " (** super-rare! **)"
+        })[animal.rarity]
         animalState = animal.getState(time.time())
         if (animalState == AnimalState.SCOOPED):
-          print(f"  {animal.type.emoji} {name} (the {animal.type.name})")
+          print(f"  {animal.type.emoji} {name} (the {animal.type.name}){modifier}")
           animalCount += 1
       if (animalCount == 0):
         print("  There's no animals in the barn right now :/")
@@ -316,6 +321,9 @@ if __name__ == "__main__":
           del animals[name]
       if barnCount == 0:
         print("  Nothing to report in the barn!")
+      if (animalCount > 0) or (barnCount > 0):
+        print("")
+        print("Hint: try asking an animal if you can scoop them: `caniscoop <name>`")
     elif command == "exit":
       break
     elif command.startswith("feed "):

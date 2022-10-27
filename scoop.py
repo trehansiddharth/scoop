@@ -332,7 +332,7 @@ if __name__ == "__main__":
         print(f"There's no such animal named '{name}'")
       else:
         animal = animals[name]
-        if animal.owner != username:
+        if (animal.owner != None) and (animal.owner != username):
           print(f"{animal.type.emoji} {name} is someone else's pet! You can't feed them.")
         else:
           feedResult = animal.feed(time.time(), grains, username)

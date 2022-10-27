@@ -303,7 +303,7 @@ if __name__ == "__main__":
       print("")
       print("In the barn:")
       barnCount = 0
-      for animal in animals:
+      for name in animals:
         animal : Animal = animals[name]
         if animal.owner != username:
           continue
@@ -332,17 +332,20 @@ if __name__ == "__main__":
         print(f"There's no such animal named '{name}'")
       else:
         animal = animals[name]
-        feedResult = animal.feed(time.time(), grains, username)
-        if (type(feedResult) == int):
-          grains -= feedResult
-          print(f"You fed {animal.type.emoji} {name} {feedResult} grains! They're full now!")
-        elif (feedResult == AnimalFeedResult.NOT_ENOUGH_GRAINS):
-          print(f"You don't have enough grains to feed {animal.type.emoji} {name}! Try picking some: `pick`")
-        elif (feedResult == AnimalFeedResult.NOT_SCOOPED):
-          print(f"{animal.type.emoji} {name} is not scooped! Try scooping them: `caniscoop {name}`")
-        elif (feedResult == AnimalFeedResult.DEAD):
-          print(f"{animal.type.emoji} {name} is dead :( Feed your animals on time next time!")
-          del animals[name]
+        if animal.owner != username:
+          print(f"{animal.type.emoji} {name} is someone else's pet! You can't feed them.")
+        else:
+          feedResult = animal.feed(time.time(), grains, username)
+          if (type(feedResult) == int):
+            grains -= feedResult
+            print(f"You fed {animal.type.emoji} {name} {feedResult} grains! They're full now!")
+          elif (feedResult == AnimalFeedResult.NOT_ENOUGH_GRAINS):
+            print(f"You don't have enough grains to feed {animal.type.emoji} {name}! Try picking some: `pick`")
+          elif (feedResult == AnimalFeedResult.NOT_SCOOPED):
+            print(f"{animal.type.emoji} {name} is not scooped! Try scooping them: `caniscoop {name}`")
+          elif (feedResult == AnimalFeedResult.DEAD):
+            print(f"{animal.type.emoji} {name} is dead :( Feed your animals on time next time!")
+            del animals[name]
     elif command == "pick":
       grains += 10
       print(f"You now have {grains} grains!")
